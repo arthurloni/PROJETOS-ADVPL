@@ -1,0 +1,68 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "totvs_language_web_debug",
+			"request": "launch",
+			"name": "TOTVS 2410",
+			"program": "${command:AskForProgramName}",
+			"cwb": "${workspaceFolder}",
+			"isMultiSession": true,
+			"enableTableSync": true,
+			"ignoreFiles": true,
+			"smartclientUrl": "http://localhost:4321/webapp/"
+		}
+	],
+	"lastPrograms": [
+		{
+			"label": "U_CAIXA"
+		},
+		{
+			"label": "U_SAUDACAO"
+		},
+		{
+			"label": "U_UserLogin"
+		},
+		{
+			"label": "U_VERIFICANDO"
+		},
+		{
+			"label": "U_TABUADA"
+		},
+		{
+			"label": "U_NomeUsuario"
+		},
+		{
+			"label": "U_NomeUsuarioQ"
+		},
+		{
+			"label": "U_MENU"
+		},
+		{
+			"label": "U_COMPARADOR"
+		},
+		{
+			"label": "U_CONTADOR"
+		},
+		{
+			"label": "U_CALC"
+		},
+		{
+			"label": "U_VALOGICO"
+		},
+		{
+			"label": "U_MENUPERSO"
+		},
+		{
+			"label": "U_RELVENDA"
+		},
+		{
+			"label": "U_CTCP003R"
+		},
+		{
+			"label": "U_LHRVT001"
+		}
+	],
+	"lastProgramExecuted": "U_LHRVT001",
+	"lastProgramArguments": []
+}

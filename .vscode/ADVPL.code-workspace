@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"totvsLanguageServer.editor.linter.includes": "C:\\TOTVS2410\\Protheus\\Protheus\\include"
+	}
+}
