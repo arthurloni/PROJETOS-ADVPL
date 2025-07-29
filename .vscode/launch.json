@@ -1,6 +1,7 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+		
 		{
 			"type": "totvs_language_web_debug",
 			"request": "launch",
@@ -63,6 +64,6 @@
 			"label": "U_LHRVT001"
 		}
 	],
-	"lastProgramExecuted": "U_LHRVT001",
+	"lastProgramExecuted": "<cancel>",
 	"lastProgramArguments": []
 }
