@@ -1,4 +1,5 @@
 #Include "TOTVS.CH"
+#Include "report.ch"
 
 /*/{Protheus.doc} LHRVT001 -> localhost relatorio vendas total 001
     RELATORIO DE VENDAS TOTAL, PEGANDO OS VENDEDORES SELECIONADOS PELO CODIGO DO VENDEDOR UTILIZANDO A SC5 -> PEDIDO DE VENDA
@@ -9,8 +10,8 @@
     @parametros XRELVENDA
     MV_PAR01 - Data Inicial
     MV_PAR02 - Data Final  
-    MV_PAR03 - Código Vendedor De
-    MV_PAR04 - Código Vendedor Até
+    MV_PAR03 - CÃ³digo Vendedor De
+    MV_PAR04 - CÃ³digo Vendedor AtÃ©
 /*/
 
 User Function LHRVT001()
@@ -19,6 +20,7 @@ User Function LHRVT001()
     Local cCodFim := ""
     Local dDataIni := Ctod(" / / ")
     Local dDataFim := Ctod(" / / ")
+    Local oReport
 
     if Pergunte("XRELVENDA",.T.)
         dDataIni := MV_PAR01
@@ -32,170 +34,117 @@ User Function LHRVT001()
         EndIf
         
         If dDataIni > dDataFim
-            MsgAlert("A data inicial não pode ser maior que a data final!")
+            MsgAlert("A data inicial nÃ£o pode ser maior que a data final!")
             Return
         EndIf
         
-        RelVend(dDataIni, dDataFim, cCodIni, cCodFim)
+        oReport := ReportDef(dDataIni, dDataFim, cCodIni, cCodFim)
+        oReport:PrintDialog()
         
     endif
 
 Return
 
-/*/{Protheus.doc} RelVend -> Relatorio venda
-    Função para criar a estrutura do relatorio de vendas
+/*/{Protheus.doc} ReportDef -> Relatorio venda
+    FunÃ§Ã£o para criar a estrutura do relatorio de vendas
     @type  Function
     @author Arthur Loni
     @since 23/07/2025
     @version 12
     @param dDataIni, Date, Data inicial
     @param dDataFim, Date, Data final
-    @param cCodIni, Character, Código inicial do vendedor
-    @param cCodFim, Character, Código final do vendedor
+    @param cCodIni, Character, CÃ³digo inicial do vendedor
+    @param cCodFim, Character, CÃ³digo final do vendedor
     /*/
 
-Static Function RelVend(dDataIni, dDataFim, cCodIni, cCodFim)
+Static Function ReportDef(dDataIni, dDataFim, cCodIni, cCodFim)
 
-    Local cQuery := ""
+    Local oReport
+    Local oSection1
+    Local cTitulo := "RelatÃ³rio de Vendas por Vendedor"
+
+    oReport := TReport():New("LHRVT001", cTitulo, , {|oReport| PrintReport(oReport, dDataIni, dDataFim, cCodIni, cCodFim)}, "RelatÃ³rio de Vendas por Vendedor no perÃ­odo")
+
+    oSection1 := TRSection():New(oReport, "Vendas por Vendedor", , , .F., .F.)
+
+    TRCell():New(oSection1, "CODIGO_VENDEDOR", , "Cod Vendedor"    , "@!", TamSX3("A3_COD")[1])
+    TRCell():New(oSection1, "NOME_VENDEDOR"  , , "Nome Vendedor"   , "@!", TamSX3("A3_NOME")[1])
+    TRCell():New(oSection1, "QTD_PEDIDO"     , , "Qtd Pedidos"     , "@E 999,999", 10)
+    TRCell():New(oSection1, "DATA_INICIAL"   , , "Data Inicial"    , "@D", 10)
+    TRCell():New(oSection1, "DATA_FINAL"     , , "Data Final"      , "@D", 10)
+    TRCell():New(oSection1, "VALOR_TOTAL"    , , "Valor Total"     , "@E 999,999,999.99", 15)
+
+
+Return oReport
+
+/*/{Protheus.doc} PrintReport -> ImpressÃ£o do Relatorio de Vendas
+    FunÃ§Ã£o para executar a query e imprimir os dados do relatorio
+    @type  Function
+    @author Arthur Loni
+    @since 23/07/2025
+    @version 12
+    @param oReport, Object, Objeto do relatÃ³rio
+    @param dDataIni, Date, Data inicial
+    @param dDataFim, Date, Data final
+    @param cCodIni, Character, CÃ³digo inicial do vendedor
+    @param cCodFim, Character, CÃ³digo final do vendedor
+    /*/
+
+Static Function PrintReport(oReport, dDataIni, dDataFim, cCodIni, cCodFim)
+
+    Local oSection1 := oReport:Section(1)
     Local cAlias := GetNextAlias()
-    Public nTotal := 0
-    
-    cQuery := QueryRelVend(dDataIni, dDataFim, cCodIni, cCodFim)
-    
-    cQuery := ChangeQuery(cQuery)
-    DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
-    
-    If (cAlias)->(EOF())
-        MsgInfo("Nenhum registro encontrado para os parâmetros informados!")
-        (cAlias)->(DbCloseArea())
-        Return
-    EndIf
-    
-    MontaTela(cAlias, dDataIni, dDataFim, cCodIni, cCodFim)
+
+    BeginSQL Alias cAlias
+        SELECT
+            A3_COD AS CODIGO_VENDEDOR,
+            A3_NOME AS NOME_VENDEDOR,
+            COUNT(C5_NUM) AS QTD_PEDIDO,
+            MIN(C5_EMISSAO) AS DATA_INICIAL,
+            MAX(C5_EMISSAO) AS DATA_FINAL,
+            SUM(C6_VALOR) AS VALOR_TOTAL
+        FROM
+            %table:SC5% SC5
+        INNER JOIN %table:SA3% SA3
+            ON A3_COD = C5_VEND1
+            AND SA3.%NotDel%
+        INNER JOIN %table:SC6% SC6
+            ON C6_NUM = C5_NUM
+            AND SC6.%NotDel%
+        WHERE 
+            SC5.%NotDel%
+            AND C5_EMISSAO BETWEEN %Exp:dDataIni% AND %Exp:dDataFim%
+            AND A3_COD BETWEEN %Exp:cCodIni% AND %Exp:cCodFim%
+        GROUP BY 
+            A3_COD,
+            A3_NOME
+        ORDER BY
+            VALOR_TOTAL DESC
+    EndSQL
+
+    oSection1:Init()
+
+    While (cAlias)->(!EOF())
+        
+        If oReport:Cancel()
+            Exit
+        EndIf
+
+        oSection1:Cell('CODIGO_VENDEDOR'):SetValue((cAlias)->CODIGO_VENDEDOR)
+        oSection1:Cell('NOME_VENDEDOR'):SetValue((cAlias)->NOME_VENDEDOR)
+        oSection1:Cell('QTD_PEDIDO'):SetValue((cAlias)->QTD_PEDIDO)
+        oSection1:Cell('DATA_INICIAL'):SetValue((cAlias)->DATA_INICIAL)
+        oSection1:Cell('DATA_FINAL'):SetValue((cAlias)->DATA_FINAL)
+        oSection1:Cell('VALOR_TOTAL'):SetValue((cAlias)->VALOR_TOTAL)
+
+        oSection1:PrintLine()
+        
+        (cAlias)->(DbSkip())
+        
+    End
+
+    oSection1:Finish()
     
     (cAlias)->(DbCloseArea())
-
-Return
-
-/*/{Protheus.doc} QueryRelVend -> Query do Relatorio de Vendas
-    Função para criar a query utilizada para trazer os dados do relatorio como
-    Nome do vendedor, quantidade dos pedidos de venda, codigo do vendedor, valor total dos pedidos de vendas realizados
-    tabelas -> SC5990 and SA3990
-    @type  Function
-    @author Arthur Loni
-    @since 23/07/2025
-    @version 12
-    @param dDataIni, Date, Data inicial
-    @param dDataFim, Date, Data final
-    @param cCodIni, Character, Código inicial do vendedor
-    @param cCodFim, Character, Código final do vendedor
-    @return Character, Query SQL montada
-    /*/
-
-Static Function QueryRelVend(dDataIni, dDataFim, cCodIni, cCodFim)
-
-    Local cQuery := ""
-    
-    cQuery := " SELECT " + CRLF
-    cQuery += "     SA3.A3_COD AS CODIGO_VENDEDOR, " + CRLF
-    cQuery += "     SA3.A3_NOME AS NOME_VENDEDOR, " + CRLF
-    cQuery += "     COUNT(SC5.C5_NUM) AS QTD_PEDIDOS, " + CRLF
-    cQuery += "     SUM(SC6.C6_VALOR) AS TOTAL_PEDIDOS, " + CRLF
-    cQuery += "     MIN(SC5.C5_EMISSAO) AS PRIMEIRA_VENDA, " + CRLF
-    cQuery += "     MAX(SC5.C5_EMISSAO) AS ULTIMA_VENDA " + CRLF
-    cQuery += " FROM " + RetSqlName("SC5") + " SC5 " + CRLF
-    cQuery += "     INNER JOIN " + RetSqlName("SA3") + " SA3 " + CRLF
-    cQuery += "         ON SA3.A3_COD = SC5.C5_VEND1 " + CRLF
-    cQuery += "         AND SA3.D_E_L_E_T_ = ' ' " + CRLF
-    cQuery += "     INNER JOIN " + RetSqlName("SC6") + " SC6 " + CRLF
-    cQuery += "         ON SC6.C6_NUM = SC5.C5_NUM " + CRLF
-    cQuery += "         AND SC6.D_E_L_E_T_ = ' ' " + CRLF
-    cQuery += " WHERE " + CRLF
-    cQuery += "     SC5.D_E_L_E_T_ = ' ' " + CRLF
-    cQuery += "     AND SC6.C6_VALOR > 0 " + CRLF
-    cQuery += "     AND SC5.C5_EMISSAO >= '" + DtoS(dDataIni) + "' " + CRLF
-    cQuery += "     AND SC5.C5_EMISSAO <= '" + DtoS(dDataFim) + "' " + CRLF
-    cQuery += "     AND SA3.A3_COD >= '" + cCodIni + "' " + CRLF
-    cQuery += "     AND SA3.A3_COD <= '" + cCodFim + "' " + CRLF
-    cQuery += " GROUP BY " + CRLF
-    cQuery += "     SA3.A3_COD, " + CRLF
-    cQuery += "     SA3.A3_NOME " + CRLF
-    cQuery += " ORDER BY " + CRLF
-    cQuery += "     TOTAL_PEDIDOS DESC " + CRLF
-
-Return cQuery
-
-/*/{Protheus.doc} MontaTela -> Monta tela com os resultados
-    Função para exibir os resultados do relatório em uma tela própria
-    @type  Function
-    @author Arthur Loni
-    @since 27/07/2025
-    @version 12
-    @param cAlias, Character, Alias da query executada
-    @param dDataIni, Date, Data inicial
-    @param dDataFim, Date, Data final
-    @param cCodIni, Character, Código inicial do vendedor
-    @param cCodFim, Character, Código final do vendedor
-    /*/
-
-Static Function MontaTela(cAlias, dDataIni, dDataFim, cCodIni, cCodFim)
-
-    Local oDlg
-    Local oListBox
-    Local aItens := {}
-    Local nTotal := 0
-    Local nLinha := 1
-    Local cTitulo := "Relatório de Vendas por Vendedor"
-    Local cSubTitulo := "Período: " + DtoC(dDataIni) + " a " + DtoC(dDataFim) + " | Vendedores: " + cCodIni + " a " + cCodFim
-    
-    While !(cAlias)->(EOF())
-        aAdd(aItens, {;
-            AllTrim((cAlias)->CODIGO_VENDEDOR),;
-            AllTrim((cAlias)->NOME_VENDEDOR),;
-            Transform((cAlias)->QTD_PEDIDOS, "@E 999,999"),;
-            Transform((cAlias)->TOTAL_PEDIDOS, "@E 999,999,999.99"),;
-            DtoC(StoD((cAlias)->PRIMEIRA_VENDA)),;
-            DtoC(StoD((cAlias)->ULTIMA_VENDA));
-        })
-        
-        nTotal += (cAlias)->TOTAL_PEDIDOS
-        (cAlias)->(DbSkip())
-    EndDo
-    
-    If Len(aItens) == 0
-        aAdd(aItens, {"", "Nenhum registro encontrado", "", "", "", ""})
-    EndIf
-    
-    DEFINE MSDIALOG oDlg TITLE cTitulo FROM 000,000 TO 500,800 PIXEL
-    
-    @ 010,010 SAY cSubTitulo SIZE 380,010 OF oDlg PIXEL FONT TFont():New("Arial",,-12,.T.)
-    
-    @ 025,010 SAY "Código"          SIZE 045,010 OF oDlg PIXEL FONT TFont():New("Arial",,-10,.F.)
-    @ 025,060 SAY "Nome Vendedor"   SIZE 130,010 OF oDlg PIXEL FONT TFont():New("Arial",,-10,.F.)
-    @ 025,120 SAY "Qtd"             SIZE 040,010 OF oDlg PIXEL FONT TFont():New("Arial",,-10,.F.)
-    @ 025,180 SAY "Total"           SIZE 060,010 OF oDlg PIXEL FONT TFont():New("Arial",,-10,.F.)
-    @ 025,240 SAY "1ª Venda"        SIZE 060,010 OF oDlg PIXEL FONT TFont():New("Arial",,-10,.F.)
-    @ 025,300 SAY "Últ. Venda"      SIZE 060,010 OF oDlg PIXEL FONT TFont():New("Arial",,-10,.F.)
-
-    @ 040,010 LISTBOX oListBox VAR nLinha FIELDS HEADER ;
-        "Código", "Nome do Vendedor", "Qtd", "Total R$", "Primeira", "Última" ;
-        SIZE 370,180 OF oDlg PIXEL
-    
-    oListBox:SetArray(aItens)
-    oListBox:bLine := {|| {;
-        aItens[oListBox:nAt][1],;
-        aItens[oListBox:nAt][2],;
-        aItens[oListBox:nAt][3],;
-        aItens[oListBox:nAt][4],;
-        aItens[oListBox:nAt][5],;
-        aItens[oListBox:nAt][6]; 
-    }}
-    
-    @ 230,010 SAY "TOTAL GERAL: R$ " + Transform(nTotal, "@E 999,999,999.99") SIZE 200,012 OF oDlg PIXEL FONT TFont():New("Arial",,-12,.T.) COLOR CLR_BLUE
-    
-    @ 230,300 BUTTON "Imprimir" SIZE 040,015 OF oDlg PIXEL ACTION Alert("Funcionalidade de impressão será implementada!")
-    @ 230,345 BUTTON "Fechar" SIZE 035,015 OF oDlg PIXEL ACTION oDlg:End()
-    
-    ACTIVATE MSDIALOG oDlg CENTERED
 
 Return
